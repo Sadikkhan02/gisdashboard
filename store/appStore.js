@@ -5,11 +5,26 @@ export const useAppStore = create((set) => ({
   dateRange: 'Last 7 days',
   viewport: null,
   locationData: [],
-  currentUserId: 'analyst-1',
-  activeChatId: 'analyst-2',
+  currentUser: null,
+  currentUserId: null,
+  activeChatId: 'group-command',
   chatUsers: [],
+  chatGroups: [],
   messagesByChat: {},
   socketConnected: false,
+  setCurrentUser: (currentUser) =>
+    set({
+      currentUser,
+      currentUserId: currentUser?.id || null,
+    }),
+  logout: () =>
+    set({
+      currentUser: null,
+      currentUserId: null,
+      activeChatId: 'group-command',
+      messagesByChat: {},
+      socketConnected: false,
+    }),
   setActiveRegion: (activeRegion) => set({ activeRegion }),
   setDateRange: (dateRange) => set({ dateRange }),
   setViewport: (viewport) => set({ viewport }),
@@ -24,6 +39,25 @@ export const useAppStore = create((set) => ({
       }
 
       return { chatUsers };
+    }),
+  setChatGroups: (chatGroups) =>
+    set((state) => {
+      const current = JSON.stringify(state.chatGroups);
+      const next = JSON.stringify(chatGroups);
+
+      if (current === next) {
+        return state;
+      }
+
+      return { chatGroups };
+    }),
+  addChatGroup: (group) =>
+    set((state) => {
+      if (state.chatGroups.some((existing) => existing.id === group.id)) {
+        return state;
+      }
+
+      return { chatGroups: [group, ...state.chatGroups] };
     }),
   setActiveChatId: (activeChatId) => set({ activeChatId }),
   setSocketConnected: (socketConnected) => set({ socketConnected }),

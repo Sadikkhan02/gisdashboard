@@ -10,7 +10,7 @@ export default function PieChart({ data }) {
     tooltip: { trigger: 'item' },
     legend: {
       bottom: 0,
-      textStyle: { color: '#4b5563' },
+      textStyle: { color: '#334155', fontWeight: 600 },
     },
     series: [
       {
@@ -18,7 +18,7 @@ export default function PieChart({ data }) {
         radius: ['45%', '70%'],
         avoidLabelOverlap: true,
         itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 3 },
-        label: { show: true, formatter: '{b}: {c}' },
+        label: { show: true, formatter: '{b}: {c}', color: '#1f2937', fontWeight: 600 },
         data,
       },
     ],

@@ -6,21 +6,22 @@ export default function BarChart({ data, title, color = '#0f766e' }) {
   const option = {
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' },
-    grid: { left: 10, right: 10, top: 40, bottom: 10, containLabel: true },
+    grid: { left: 10, right: 10, top: 18, bottom: 10, containLabel: true },
     xAxis: {
       type: 'category',
       data: data.map((item) => item.name),
       axisLine: { lineStyle: { color: '#d1d5db' } },
-      axisLabel: { color: '#4b5563' },
+      axisLabel: { color: '#334155', interval: 0 },
     },
     yAxis: {
       type: 'value',
       axisLine: { show: false },
       splitLine: { lineStyle: { color: '#e5e7eb' } },
-      axisLabel: { color: '#6b7280' },
+      axisLabel: { color: '#475569' },
     },
     series: [
       {
+        name: title || 'Incidents',
         data: data.map((item) => item.value),
         type: 'bar',
         barWidth: '48%',

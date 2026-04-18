@@ -7,6 +7,11 @@ const messageSchema = new Schema(
       required: true,
       trim: true,
     },
+    senderName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     receiverId: {
       type: String,
       required: true,
@@ -19,7 +24,7 @@ const messageSchema = new Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'image', 'file'],
+      enum: ['text', 'image', 'file', 'call'],
       default: 'text',
     },
     fileUrl: {

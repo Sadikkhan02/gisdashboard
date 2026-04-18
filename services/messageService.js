@@ -4,18 +4,23 @@ import { dbConnect } from '@/lib/mongodb';
 export async function getConversationMessages(userId, peerId) {
   await dbConnect();
 
-  const messages = await Message.find({
-    $or: [
-      { senderId: userId, receiverId: peerId },
-      { senderId: peerId, receiverId: userId },
-    ],
-  })
+  const query = peerId.startsWith('group-')
+    ? { receiverId: peerId }
+    : {
+        $or: [
+          { senderId: userId, receiverId: peerId },
+          { senderId: peerId, receiverId: userId },
+        ],
+      };
+
+  const messages = await Message.find(query)
     .sort({ createdAt: 1 })
     .lean();
 
   return messages.map((message) => ({
     id: message._id.toString(),
     senderId: message.senderId,
+    senderName: message.senderName || '',
     receiverId: message.receiverId,
     message: message.message,
     type: message.type,
@@ -30,6 +35,7 @@ export async function createMessage(payload) {
 
   const created = await Message.create({
     senderId: payload.senderId,
+    senderName: payload.senderName || '',
     receiverId: payload.receiverId,
     message: payload.message,
     type: payload.type || 'text',
@@ -40,6 +46,7 @@ export async function createMessage(payload) {
   return {
     id: created._id.toString(),
     senderId: created.senderId,
+    senderName: created.senderName || '',
     receiverId: created.receiverId,
     message: created.message,
     type: created.type,

@@ -5,20 +5,24 @@ import ReactECharts from 'echarts-for-react';
 export default function AreaChart({ data }) {
   const option = {
     tooltip: { trigger: 'axis' },
-    grid: { left: 10, right: 10, top: 20, bottom: 10, containLabel: true },
+    legend: {
+      top: 0,
+      textStyle: { color: '#334155', fontWeight: 600 },
+    },
+    grid: { left: 10, right: 10, top: 40, bottom: 10, containLabel: true },
     xAxis: {
       type: 'category',
       data: data.map((item) => item.label),
-      axisLabel: { color: '#4b5563' },
+      axisLabel: { color: '#334155' },
     },
     yAxis: {
       type: 'value',
       splitLine: { lineStyle: { color: '#e5e7eb' } },
-      axisLabel: { color: '#6b7280' },
+      axisLabel: { color: '#475569' },
     },
     series: [
       {
-        name: 'Primary',
+        name: 'Current',
         data: data.map((item) => item.primary),
         type: 'line',
         smooth: true,
@@ -27,7 +31,7 @@ export default function AreaChart({ data }) {
         itemStyle: { color: '#0e7490' },
       },
       {
-        name: 'Secondary',
+        name: 'Previous',
         data: data.map((item) => item.secondary),
         type: 'line',
         smooth: true,

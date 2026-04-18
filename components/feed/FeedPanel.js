@@ -9,8 +9,9 @@ const mockEvents = [
 
 export default function FeedPanel({ events = mockEvents }) {
   return (
-    <div className="h-full overflow-y-auto rounded-lg bg-white p-4 shadow">
-      <h3 className="mb-4 font-semibold">Live Activity Feed</h3>
+    <div className="h-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 text-slate-900 shadow-sm">
+      <h3 className="font-semibold text-slate-950">Live Activity Feed</h3>
+      <p className="mb-4 mt-1 text-xs text-slate-500">Newest operational events from the selected region.</p>
       <div className="space-y-2">
         {events.map((event) => <FeedItem key={event.id} {...event} />)}
       </div>
