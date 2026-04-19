@@ -64,7 +64,13 @@ function getSeverityColor(value = 1) {
   return '#0f766e';
 }
 
-export default function MapComponent({ markers = [], heatmapData = [], onLayerChange, onViewportChange }) {
+export default function MapComponent({ 
+  markers = [], 
+  heatmapData = [], 
+  onLayerChange, 
+  onViewportChange,
+  onMarkerClick
+}) {
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [selectedLayer, setSelectedLayer] = useState('incidents');
   const [tileLayer, setTileLayer] = useState('street');
@@ -111,6 +117,9 @@ export default function MapComponent({ markers = [], heatmapData = [], onLayerCh
             <CircleMarker
               key={marker.id}
               center={[marker.lat, marker.lng]}
+              eventHandlers={{
+                click: () => onMarkerClick?.(marker),
+              }}
               pathOptions={{
                 color: '#ffffff',
                 fillColor: getSeverityColor(marker.weight),

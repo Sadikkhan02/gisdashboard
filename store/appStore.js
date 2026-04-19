@@ -12,6 +12,32 @@ export const useAppStore = create((set) => ({
   chatGroups: [],
   messagesByChat: {},
   socketConnected: false,
+  currentView: 'dashboard',
+  isSidebarExpanded: false,
+  selectedLocation: null,
+  unreadCounts: {},
+  callNotification: null,
+  setCurrentView: (currentView) => set({ currentView }),
+  toggleSidebar: () => set((state) => ({ isSidebarExpanded: !state.isSidebarExpanded })),
+  setSelectedLocation: (selectedLocation) => set({ selectedLocation }),
+  incrementUnreadCount: (chatId) =>
+    set((state) => ({
+      unreadCounts: {
+        ...state.unreadCounts,
+        [chatId]: (state.unreadCounts[chatId] || 0) + 1,
+      },
+    })),
+  clearUnreadCount: (chatId) =>
+    set((state) => {
+      if (!state.unreadCounts[chatId]) return state;
+      return {
+        unreadCounts: {
+          ...state.unreadCounts,
+          [chatId]: 0,
+        },
+      };
+    }),
+  setCallNotification: (callNotification) => set({ callNotification }),
   setCurrentUser: (currentUser) =>
     set({
       currentUser,

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/layout/Navbar';
+import Sidebar from '@/components/layout/Sidebar';
 import KPISection from '@/components/kpi/KPISection';
 import IncidentTrendChart from '@/components/charts/IncidentTrendChart';
 import IncidentsByHourChart from '@/components/charts/IncidentsByHourChart';
@@ -12,6 +13,8 @@ import FeedPanel from '@/components/feed/FeedPanel';
 import DonutChart from '@/components/charts/DonutChart';
 import AreaChart from '@/components/charts/AreaChart';
 import ChatBox from '@/components/chat/ChatBox';
+import SocketListener from '@/components/chat/SocketListener';
+import CallNotificationOverlay from '@/components/chat/CallNotificationOverlay';
 import Card from '@/components/common/Card';
 import { fetchViewportAnalytics } from '@/lib/api';
 import { useAppStore } from '@/store/appStore';
@@ -111,6 +114,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [region, setRegion] = useState('All Regions');
   const [dateRange, setDateRange] = useState('Last 7 days');
+  
   const currentUser = useAppStore((state) => state.currentUser);
   const currentUserId = useAppStore((state) => state.currentUserId);
   const setCurrentUser = useAppStore((state) => state.setCurrentUser);
@@ -118,6 +122,11 @@ export default function DashboardPage() {
   const viewport = useAppStore((state) => state.viewport);
   const setViewport = useAppStore((state) => state.setViewport);
   const setLocationData = useAppStore((state) => state.setLocationData);
+  const currentView = useAppStore((state) => state.currentView);
+  const isSidebarExpanded = useAppStore((state) => state.isSidebarExpanded);
+  const selectedLocation = useAppStore((state) => state.selectedLocation);
+  const setSelectedLocation = useAppStore((state) => state.setSelectedLocation);
+  
   const fallbackData = getMockDashboardData();
 
   useEffect(() => {
@@ -176,111 +185,165 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-slate-950">
-      <Navbar
-        user={currentUser}
-        onLogout={handleLogout}
-        onRegionChange={setRegion}
-        onDateRangeChange={setDateRange}
-      />
+      <SocketListener />
+      <CallNotificationOverlay />
+      <Sidebar />
+      
+      <main className={`transition-all duration-300 ${isSidebarExpanded ? 'md:pl-64' : 'md:pl-20'}`}>
+        <Navbar
+          user={currentUser}
+          onLogout={handleLogout}
+          onRegionChange={setRegion}
+          onDateRangeChange={setDateRange}
+        />
 
-      <section className="px-6 pt-6">
-        <div className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm">
-          <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#168c7a]">Operations overview</p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-950">Geospatial intelligence dashboard</h1>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                Monitoring regional incident density, crime trends, population exposure, and team response channels.
-              </p>
+        {/* Header Section (Only in Dashboard) */}
+        {currentView === 'dashboard' && (
+          <section className="px-6 pt-6">
+            <div className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm">
+              <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#168c7a]">Operations overview {selectedLocation ? `— ${selectedLocation.name}` : ''}</p>
+                  <h1 className="mt-1 text-2xl font-bold text-slate-950">
+                    {selectedLocation ? `Intelligence Report: ${selectedLocation.name}` : 'Geospatial intelligence dashboard'}
+                  </h1>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                    {selectedLocation 
+                      ? `Displaying hyper-local analytics and safety metrics for ${selectedLocation.name}. Crime count: ${selectedLocation.crime}.`
+                      : 'Monitoring regional incident density, crime trends, population exposure, and team response channels.'
+                    }
+                  </p>
+                </div>
+                {selectedLocation && (
+                  <button 
+                    onClick={() => setSelectedLocation(null)}
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Clear Filter
+                  </button>
+                )}
+                {!selectedLocation && (
+                  <div className="rounded-lg bg-[#e9f8f4] px-4 py-3 text-sm text-[#0f4d43]">
+                    Signed in as <span className="font-semibold">{currentUser?.name}</span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="rounded-lg bg-[#e9f8f4] px-4 py-3 text-sm text-[#0f4d43]">
-              Signed in as <span className="font-semibold">{currentUser?.name}</span>
+          </section>
+        )}
+
+        {/* Dashboard View */}
+        {currentView === 'dashboard' && (
+          <>
+            <KPISection data={selectedLocation ? {
+              ...kpiData,
+              totalLocations: '1',
+              totalCrime: selectedLocation.crime,
+              totalPopulation: (selectedLocation.crime * 210).toLocaleString(),
+            } : kpiData} />
+            <div className="grid grid-cols-12 gap-4 px-6 pb-6">
+              <div className="col-span-12 xl:col-span-8">
+                <MapComponent
+                  markers={mapMarkers}
+                  heatmapData={heatmapPoints}
+                  onLayerChange={handleLayerChange}
+                  onViewportChange={setViewport}
+                  onMarkerClick={setSelectedLocation}
+                />
+              </div>
+              <div className="col-span-12 space-y-4 xl:col-span-4">
+                <Card title={selectedLocation ? `Snapshot: ${selectedLocation.name}` : "Analytics Snapshot"}>
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs text-slate-500">{isFetching ? 'Updating...' : summary.dataSource}</span>
+                  </div>
+                  <MetricRow label="Point ID" value={selectedLocation ? selectedLocation.id.toUpperCase() : 'Aggregated'} tone="text-teal-700" />
+                  <MetricRow label="Population Density" value={selectedLocation ? 'High' : summary.totalPopulation.toLocaleString()} />
+                  <MetricRow label="Local Crime Index" value={selectedLocation ? selectedLocation.crime : summary.totalCrime.toLocaleString()} tone="text-rose-600" />
+                  <MetricRow label="Development" value={selectedLocation ? '82%' : `${Math.round(summary.averageDevelopmentIndex * 100)}%`} tone="text-sky-700" />
+                </Card>
+                <FeedPanel events={selectedLocation ? events.filter(e => e.location.includes(selectedLocation.name) || e.severity === 'high') : events} />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Connect View */}
+        {currentView === 'connect' && (
+          <div className="p-6">
+            <div className="rounded-lg border border-slate-200 bg-white p-1 shadow-sm h-[calc(100vh-120px)] overflow-hidden">
+               <ChatBox />
             </div>
           </div>
-        </div>
-      </section>
+        )}
 
-      <KPISection data={kpiData} />
-
-      <div className="grid grid-cols-12 gap-4 px-6 pb-6">
-        <div className="col-span-12 xl:col-span-8">
-          <MapComponent
-            markers={mapMarkers}
-            heatmapData={heatmapPoints}
-            onLayerChange={handleLayerChange}
-            onViewportChange={setViewport}
-          />
-        </div>
-
-        <div className="col-span-12 space-y-4 xl:col-span-4">
-          <Card>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="font-semibold text-slate-950">Analytics Snapshot</h3>
-              <span className="text-xs text-slate-500">{isFetching ? 'Updating...' : summary.dataSource}</span>
+        {/* Charts View */}
+        {currentView === 'charts' && (
+          <div className="space-y-4 p-6">
+             <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-12 text-sm">
+                   {selectedLocation && (
+                     <div className="mb-4 flex items-center justify-between rounded-lg bg-[#123c35] px-4 py-3 text-white">
+                        <span>Viewing charts for <strong>{selectedLocation.name}</strong></span>
+                        <button onClick={() => setSelectedLocation(null)} className="text-xs underline hover:text-teal-200">Reset to Global</button>
+                     </div>
+                   )}
+                   <MapComponent
+                    markers={mapMarkers}
+                    heatmapData={heatmapPoints}
+                    onLayerChange={handleLayerChange}
+                    onViewportChange={setViewport}
+                    onMarkerClick={setSelectedLocation}
+                  />
+                </div>
+             </div>
+             
+             <div className="grid grid-cols-12 gap-4 pb-6">
+              <div className="col-span-12 lg:col-span-6 xl:col-span-3">
+                <Card title="Crime Trend">
+                  <p className="mb-3 text-xs text-slate-500">Weekly reported incidents.</p>
+                  <IncidentTrendChart data={selectedLocation ? trendData.map(d => ({ ...d, crime: d.crime / 4 })) : trendData} />
+                </Card>
+              </div>
+              <div className="col-span-12 lg:col-span-6 xl:col-span-3">
+                <Card title="Crime Distribution">
+                  <p className="mb-3 text-xs text-slate-500">Incident count by category.</p>
+                  <IncidentsByCategoryChart data={categoryData} />
+                </Card>
+              </div>
+              <div className="col-span-12 lg:col-span-6 xl:col-span-3">
+                <Card title="Hourly Pattern">
+                  <p className="mb-3 text-xs text-slate-500">Incidents by time of day.</p>
+                  <IncidentsByHourChart data={hourlyData} />
+                </Card>
+              </div>
+              <div className="col-span-12 lg:col-span-6 xl:col-span-3">
+                <Card title="Comparative Metrics">
+                  <p className="mb-3 text-xs text-slate-500">Population, crime, and development.</p>
+                  <AreaChart data={selectedLocation ? areaData.map(d => ({ ...d, primary: d.primary / 2 })) : areaData} />
+                </Card>
+              </div>
             </div>
-            <MetricRow label="Locations in View" value={summary.locationsInView} tone="text-teal-700" />
-            <MetricRow label="Population in View" value={summary.totalPopulation.toLocaleString()} />
-            <MetricRow label="Crime Count" value={summary.totalCrime.toLocaleString()} tone="text-rose-600" />
-            <MetricRow label="Avg Development" value={`${Math.round(summary.averageDevelopmentIndex * 100)}%`} tone="text-sky-700" />
-          </Card>
 
-          <Card>
-            <h3 className="mb-1 font-semibold text-slate-950">Severity Share</h3>
-            <p className="mb-3 text-xs text-slate-500">Low, medium, and high severity incidents inside the current viewport.</p>
-            <DonutChart data={pieData} title="Viewport Severity" />
-          </Card>
-
-          <FeedPanel events={events} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-12 gap-4 px-6 pb-6">
-        <div className="col-span-12 lg:col-span-6 xl:col-span-3">
-          <Card>
-            <h3 className="mb-1 font-semibold text-slate-950">Crime Trend</h3>
-            <p className="mb-3 text-xs text-slate-500">Weekly reported incidents compared with the historical baseline.</p>
-            <IncidentTrendChart data={trendData} />
-          </Card>
-        </div>
-        <div className="col-span-12 lg:col-span-6 xl:col-span-3">
-          <Card>
-            <h3 className="mb-1 font-semibold text-slate-950">Crime Distribution</h3>
-            <p className="mb-3 text-xs text-slate-500">Incident count grouped by category for the selected region.</p>
-            <IncidentsByCategoryChart data={categoryData} />
-          </Card>
-        </div>
-        <div className="col-span-12 lg:col-span-6 xl:col-span-3">
-          <Card>
-            <h3 className="mb-1 font-semibold text-slate-950">Hourly Pattern</h3>
-            <p className="mb-3 text-xs text-slate-500">Incidents by time of day with expected activity as comparison.</p>
-            <IncidentsByHourChart data={hourlyData} />
-          </Card>
-        </div>
-        <div className="col-span-12 lg:col-span-6 xl:col-span-3">
-          <Card>
-            <h3 className="mb-1 font-semibold text-slate-950">Comparative Metrics</h3>
-            <p className="mb-3 text-xs text-slate-500">Population, crime, and development values against previous period.</p>
-            <AreaChart data={areaData} />
-          </Card>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-12 gap-4 px-6 pb-6">
-        <div className="col-span-12 xl:col-span-8">
-          <ChatBox />
-        </div>
-        <div className="col-span-12 grid grid-cols-1 gap-4 md:grid-cols-3 xl:col-span-4 xl:grid-cols-1">
-          <Card>
-            <DonutChart data={activeCases} title="Active Cases %" />
-          </Card>
-          <Card>
-            <DonutChart data={resolvedCases} title="Resolved Cases %" />
-          </Card>
-          <Card>
-            <DonutChart data={pendingCases} title="Pending Cases %" />
-          </Card>
-        </div>
-      </div>
+            <div className="grid grid-cols-12 gap-4 pb-6">
+               <div className="col-span-12 grid grid-cols-1 gap-4 md:grid-cols-4 xl:grid-cols-4">
+                  <Card>
+                    <DonutChart data={pieData} title="Viewport Severity" />
+                  </Card>
+                  <Card>
+                    <DonutChart data={activeCases} title="Active Cases %" />
+                  </Card>
+                  <Card>
+                    <DonutChart data={resolvedCases} title="Resolved Cases %" />
+                  </Card>
+                  <Card>
+                    <DonutChart data={pendingCases} title="Pending Cases %" />
+                  </Card>
+                </div>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
+

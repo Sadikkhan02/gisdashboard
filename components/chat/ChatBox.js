@@ -11,7 +11,7 @@ function formatTime(value) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function UserListItem({ user, active, onClick }) {
+function UserListItem({ user, active, unread, onClick }) {
   const isGroup = user.type === 'group';
   const memberCount = user.memberDetails?.length || user.members?.length || 0;
   const statusTone = {
@@ -27,17 +27,25 @@ function UserListItem({ user, active, onClick }) {
       type="button"
     >
       <div className="flex items-center justify-between">
-        <div className="min-w-0">
-          <div className="font-medium text-slate-900">{user.name}</div>
+        <div className="min-w-0 pr-2">
+          <div className="font-medium text-slate-900 truncate">{user.name}</div>
           <div className="truncate text-xs text-slate-500">
             {isGroup ? `${memberCount} members` : user.description || user.role}
           </div>
         </div>
-        {isGroup ? (
-          <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">Group</span>
-        ) : (
-          <span className={`h-2.5 w-2.5 rounded-full ${statusTone}`} />
-        )}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {unread > 0 ? (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-teal-600 px-1 text-[10px] font-bold text-white">
+              {unread}
+            </span>
+          ) : (
+            isGroup ? (
+              <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">Group</span>
+            ) : (
+              <span className={`h-2.5 w-2.5 rounded-full ${statusTone}`} />
+            )
+          )}
+        </div>
       </div>
     </button>
   );
@@ -112,6 +120,10 @@ export default function ChatBox() {
   const appendMessage = useAppStore((state) => state.appendMessage);
   const socketConnected = useAppStore((state) => state.socketConnected);
   const setSocketConnected = useAppStore((state) => state.setSocketConnected);
+  const unreadCounts = useAppStore((state) => state.unreadCounts);
+  const clearUnreadCount = useAppStore((state) => state.clearUnreadCount);
+  const globalCallNotification = useAppStore((state) => state.callNotification);
+  const setGlobalCallNotification = useAppStore((state) => state.setCallNotification);
 
   const { data: directory = { users: [], groups: [] } } = useQuery({
     queryKey: ['chat-directory'],
@@ -151,8 +163,16 @@ export default function ChatBox() {
   useEffect(() => {
     if (activeChatId) {
       setMessagesForChat(activeChatId, messages);
+      clearUnreadCount(activeChatId);
     }
-  }, [activeChatId, messages, setMessagesForChat]);
+  }, [activeChatId, messages, setMessagesForChat, clearUnreadCount]);
+
+  useEffect(() => {
+    if (globalCallNotification && callStatus === 'idle') {
+      setCallStatus('incoming');
+      setCallInfo(globalCallNotification);
+    }
+  }, [globalCallNotification, callStatus]);
 
   useEffect(() => {
     const socket = getSocketClient();
@@ -465,7 +485,7 @@ export default function ChatBox() {
   };
 
   const endCall = () => {
-    const call = activeCallRef.current || callInfo;
+    const call = activeCallRef.current || callInfo || globalCallNotification;
     const historyReceiverId = call?.type === 'group' ? call.groupId : call?.peerUserId || call?.fromUserId;
 
     if (call?.peerUserId || call?.fromUserId) {
@@ -481,6 +501,7 @@ export default function ChatBox() {
       });
     }
 
+    setGlobalCallNotification(null);
     resetCall();
   };
 
@@ -807,16 +828,17 @@ export default function ChatBox() {
           </form>
         )}
 
-        <div className="max-h-[13rem] space-y-2 overflow-y-auto md:max-h-[29rem]">
-          {conversations.map((user) => (
-            <UserListItem
-              key={user.id}
-              user={user}
-              active={user.id === activeChatId}
-              onClick={() => setActiveChatId(user.id)}
-            />
-          ))}
-        </div>
+          <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+            {conversations.map((user) => (
+              <UserListItem
+                key={user.id}
+                user={user}
+                active={activeChatId === user.id}
+                unread={unreadCounts[user.id] || 0}
+                onClick={() => setActiveChatId(user.id)}
+              />
+            ))}
+          </div>
       </div>
 
       <div className="col-span-12 flex min-h-0 flex-col md:col-span-8">
