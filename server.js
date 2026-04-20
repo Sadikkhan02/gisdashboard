@@ -319,6 +319,10 @@ app.prepare().then(() => {
       emitToUser(payload.toUserId, 'webrtc_ice_candidate', payload);
     });
 
+    socket.on('webrtc_screen_share', (payload = {}) => {
+      socket.to(`call:${payload.callId}`).emit('webrtc_screen_share', payload);
+    });
+
     socket.on('end_call', (payload = {}) => {
       if (payload.type === 'group') {
         const call = activeCalls.get(payload.callId);

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchChatDirectory, fetchMessages } from '@/lib/api';
 import { getSocketClient } from '@/lib/socket-client';
+import { useWebRTC } from '@/hooks/useWebRTC';
+import VideoCallOverlay from '@/components/video/VideoCallOverlay';
 import { useAppStore } from '@/store/appStore';
 
 function formatTime(value) {
@@ -76,37 +78,8 @@ function MessageBubble({ message, own }) {
   );
 }
 
-function RemoteVideoTile({ participant }) {
-  const videoRef = useRef(null);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.srcObject = participant.stream;
-    }
-  }, [participant.stream]);
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-white/15 bg-black">
-      <video ref={videoRef} autoPlay playsInline className="h-40 w-full object-cover" />
-      <div className="px-3 py-2 text-xs text-white/70">{participant.name || 'Participant'}</div>
-    </div>
-  );
-}
 
 export default function ChatBox() {
-  const localVideoRef = useRef(null);
-  const localStreamRef = useRef(null);
-  const peerConnectionsRef = useRef(new Map());
-  const activeCallRef = useRef(null);
-  const [draft, setDraft] = useState('');
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [groupName, setGroupName] = useState('');
-  const [selectedMembers, setSelectedMembers] = useState([]);
-  const [chatNotice, setChatNotice] = useState('');
-  const [callStatus, setCallStatus] = useState('idle');
-  const [callInfo, setCallInfo] = useState(null);
-  const [callError, setCallError] = useState('');
-  const [remoteParticipants, setRemoteParticipants] = useState([]);
   const currentUserId = useAppStore((state) => state.currentUserId);
   const activeChatId = useAppStore((state) => state.activeChatId);
   const setActiveChatId = useAppStore((state) => state.setActiveChatId);
@@ -124,6 +97,12 @@ export default function ChatBox() {
   const clearUnreadCount = useAppStore((state) => state.clearUnreadCount);
   const globalCallNotification = useAppStore((state) => state.callNotification);
   const setGlobalCallNotification = useAppStore((state) => state.setCallNotification);
+
+  const [draft, setDraft] = useState('');
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [chatNotice, setChatNotice] = useState('');
 
   const { data: directory = { users: [], groups: [] } } = useQuery({
     queryKey: ['chat-directory'],
@@ -167,12 +146,6 @@ export default function ChatBox() {
     }
   }, [activeChatId, messages, setMessagesForChat, clearUnreadCount]);
 
-  useEffect(() => {
-    if (globalCallNotification && callStatus === 'idle') {
-      setCallStatus('incoming');
-      setCallInfo(globalCallNotification);
-    }
-  }, [globalCallNotification, callStatus]);
 
   useEffect(() => {
     const socket = getSocketClient();
@@ -259,100 +232,6 @@ export default function ChatBox() {
     [currentUserId, directory.users]
   );
 
-  const stopLocalMedia = useCallback(() => {
-    localStreamRef.current?.getTracks().forEach((track) => track.stop());
-    localStreamRef.current = null;
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null;
-    }
-
-  }, []);
-
-  const resetCall = useCallback(() => {
-    peerConnectionsRef.current.forEach((connection) => connection.close());
-    peerConnectionsRef.current.clear();
-    activeCallRef.current = null;
-    stopLocalMedia();
-    setRemoteParticipants([]);
-    setCallStatus('idle');
-    setCallInfo(null);
-  }, [stopLocalMedia]);
-
-  const getLocalStream = useCallback(async () => {
-    if (localStreamRef.current) {
-      return localStreamRef.current;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('Camera and microphone access is not available in this browser.');
-    }
-
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    localStreamRef.current = stream;
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    return stream;
-  }, []);
-
-  const removeRemoteParticipant = useCallback((peerUserId) => {
-    const connection = peerConnectionsRef.current.get(peerUserId);
-    connection?.close();
-    peerConnectionsRef.current.delete(peerUserId);
-    setRemoteParticipants((current) => current.filter((participant) => participant.userId !== peerUserId));
-  }, []);
-
-  const createPeerConnection = useCallback(async (peerUserId, callId, peerName = 'Participant') => {
-    const existingConnection = peerConnectionsRef.current.get(peerUserId);
-    if (existingConnection) {
-      return existingConnection;
-    }
-
-    const socket = getSocketClient();
-    const stream = await getLocalStream();
-    const peerConnection = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    });
-
-    stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
-
-    peerConnection.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-
-      if (remoteStream) {
-        setRemoteParticipants((current) => {
-          const withoutCurrent = current.filter((participant) => participant.userId !== peerUserId);
-          return [...withoutCurrent, { userId: peerUserId, name: peerName, stream: remoteStream }];
-        });
-      }
-    };
-
-    peerConnection.onicecandidate = (event) => {
-      if (!event.candidate) {
-        return;
-      }
-
-      socket.emit('webrtc_ice_candidate', {
-        callId,
-        fromUserId: currentUserId,
-        toUserId: peerUserId,
-        candidate: event.candidate,
-      });
-    };
-
-    peerConnection.onconnectionstatechange = () => {
-      if (['failed', 'disconnected', 'closed'].includes(peerConnection.connectionState)) {
-        removeRemoteParticipant(peerUserId);
-      }
-    };
-
-    peerConnectionsRef.current.set(peerUserId, peerConnection);
-    return peerConnection;
-  }, [currentUserId, getLocalStream, removeRemoteParticipant]);
-
   const recordCallHistory = useCallback(
     (message, receiverId) => {
       if (!receiverId || !currentUserId) {
@@ -370,325 +249,49 @@ export default function ChatBox() {
     [currentUserId, currentUserName]
   );
 
-  const startVideoCall = async () => {
-    if (!activeChatUser) {
-      setCallError('Select a chat before starting a call.');
-      return;
-    }
-
-    try {
-      setCallError('');
-      await getLocalStream();
-
-      if (activeChatUser.type === 'group') {
-        const call = {
-          callId: `call-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          groupId: activeChatUser.id,
-          groupName: activeChatUser.name,
-          fromUserId: currentUserId,
-          fromName: currentUserName,
-          type: 'group',
-          peerName: activeChatUser.name,
-        };
-
-        activeCallRef.current = call;
-        setCallInfo(call);
-        setCallStatus('active');
-        recordCallHistory(`${currentUserName} started a group video call.`, activeChatUser.id);
-        getSocketClient().emit('start_group_call', call);
-        return;
-      }
-
-      const call = {
-        callId: `call-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        fromUserId: currentUserId,
-        fromName: currentUserName,
-        targetId: activeChatUser.id,
-        targetName: activeChatUser.name,
-        peerUserId: activeChatUser.id,
-        peerName: activeChatUser.name,
-        type: 'direct',
-      };
-
-      activeCallRef.current = call;
-      setCallInfo(call);
-      setCallStatus('outgoing');
-      recordCallHistory(`${currentUserName} started a video call.`, activeChatUser.id);
-      getSocketClient().emit('start_call', call);
-    } catch (error) {
-      setCallError(error.message);
-      resetCall();
-    }
-  };
-
-  const acceptCall = async () => {
-    if (!callInfo) {
-      return;
-    }
-
-    try {
-      setCallError('');
-      if (callInfo.type === 'group') {
-        activeCallRef.current = {
-          ...callInfo,
-          type: 'group',
-        };
-        await getLocalStream();
-        setCallStatus('active');
-        recordCallHistory(`${currentUserName} joined the group video call.`, callInfo.groupId);
-        getSocketClient().emit('accept_group_call', {
-          callId: callInfo.callId,
-          groupId: callInfo.groupId,
-          fromUserId: currentUserId,
-          fromName: currentUserName,
-        });
-        return;
-      }
-
-      activeCallRef.current = {
-        ...callInfo,
-        peerUserId: callInfo.fromUserId,
-        peerName: callInfo.fromName,
-      };
-      await createPeerConnection(callInfo.fromUserId, callInfo.callId);
-      setCallStatus('active');
-      recordCallHistory(`${currentUserName} accepted the video call.`, callInfo.fromUserId);
-      getSocketClient().emit('accept_call', {
-        callId: callInfo.callId,
-        fromUserId: currentUserId,
-        fromName: currentUserName,
-        toUserId: callInfo.fromUserId,
-      });
-    } catch (error) {
-      setCallError(error.message);
-      resetCall();
-    }
-  };
-
-  const rejectCall = () => {
-    if (callInfo?.type === 'group') {
-      recordCallHistory(`${currentUserName} declined the group video call.`, callInfo.groupId);
-      resetCall();
-      return;
-    }
-
-    if (callInfo?.fromUserId) {
-      recordCallHistory(`${currentUserName} declined the video call.`, callInfo.fromUserId);
-      getSocketClient().emit('reject_call', {
-        callId: callInfo.callId,
-        fromUserId: currentUserId,
-        toUserId: callInfo.fromUserId,
-      });
-    }
-
-    resetCall();
-  };
-
-  const endCall = () => {
-    const call = activeCallRef.current || callInfo || globalCallNotification;
-    const historyReceiverId = call?.type === 'group' ? call.groupId : call?.peerUserId || call?.fromUserId;
-
-    if (call?.peerUserId || call?.fromUserId) {
-      recordCallHistory(
-        call.type === 'group' ? `${currentUserName} left the group video call.` : `${currentUserName} ended the video call.`,
-        historyReceiverId
-      );
-      getSocketClient().emit('end_call', {
-        callId: call.callId,
-        fromUserId: currentUserId,
-        toUserId: call.peerUserId || call.fromUserId,
-        type: call.type,
-      });
-    }
-
+  const handleCallEndCleanup = useCallback(() => {
     setGlobalCallNotification(null);
-    resetCall();
-  };
+  }, [setGlobalCallNotification]);
+
+  const {
+    localVideoRef,
+    callStatus,
+    setCallStatus,
+    callInfo,
+    setCallInfo,
+    callError,
+    remoteParticipants,
+    audioEnabled,
+    videoEnabled,
+    isScreenSharing,
+    toggleAudio,
+    toggleVideo,
+    startScreenShare,
+    stopScreenShare,
+    startVideoCall,
+    acceptCall,
+    rejectCall,
+    endCall,
+    resetCall,
+  } = useWebRTC({
+    currentUserId,
+    currentUserName,
+    activeChatUser,
+    onCallHistoryRecord: recordCallHistory,
+    onCallEnd: handleCallEndCleanup,
+  });
 
   useEffect(() => {
-    const socket = getSocketClient();
-
-    const handleIncomingCall = (call) => {
-      if (activeCallRef.current) {
-        socket.emit('reject_call', {
-          callId: call.callId,
-          fromUserId: currentUserId,
-          toUserId: call.fromUserId,
-        });
-        return;
-      }
-
-      activeCallRef.current = {
-        ...call,
-        peerUserId: call.fromUserId,
-        peerName: call.fromName,
-      };
-      setCallInfo(call);
+    if (globalCallNotification && callStatus === 'idle') {
       setCallStatus('incoming');
-      setCallError('');
-    };
+      setCallInfo(globalCallNotification);
+    }
+  }, [globalCallNotification, callStatus, setCallStatus, setCallInfo]);
 
-    const handleIncomingGroupCall = (call) => {
-      if (call.fromUserId === currentUserId || activeCallRef.current) {
-        return;
-      }
-
-      activeCallRef.current = {
-        ...call,
-        type: 'group',
-      };
-      setCallInfo({
-        ...call,
-        type: 'group',
-      });
-      setCallStatus('incoming');
-      setCallError('');
-    };
-
-    const handleCallAccepted = async (payload) => {
-      const call = activeCallRef.current;
-
-      if (!call || call.callId !== payload.callId) {
-        return;
-      }
-
-      try {
-        const peerConnection = await createPeerConnection(payload.fromUserId, payload.callId, payload.fromName);
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        activeCallRef.current = {
-          ...call,
-          peerUserId: payload.fromUserId,
-          peerName: payload.fromName,
-        };
-        setCallStatus('active');
-        socket.emit('webrtc_offer', {
-          callId: payload.callId,
-          fromUserId: currentUserId,
-          fromName: currentUserName,
-          toUserId: payload.fromUserId,
-          offer,
-        });
-      } catch (error) {
-        setCallError(error.message);
-        resetCall();
-      }
-    };
-
-    const handleWebRtcOffer = async (payload) => {
-      try {
-        const call = activeCallRef.current || {
-          callId: payload.callId,
-          peerUserId: payload.fromUserId,
-        };
-        const peerConnection = peerConnectionsRef.current.get(payload.fromUserId) ||
-          (await createPeerConnection(payload.fromUserId, payload.callId, payload.fromName));
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(payload.offer));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        activeCallRef.current = call;
-        setCallStatus('active');
-        socket.emit('webrtc_answer', {
-          callId: payload.callId,
-          fromUserId: currentUserId,
-          toUserId: payload.fromUserId,
-          answer,
-        });
-      } catch (error) {
-        setCallError(error.message);
-        resetCall();
-      }
-    };
-
-    const handleWebRtcAnswer = async (payload) => {
-      const peerConnection = peerConnectionsRef.current.get(payload.fromUserId);
-      if (!peerConnection) {
-        return;
-      }
-
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(payload.answer));
-    };
-
-    const handleIceCandidate = async (payload) => {
-      const peerConnection = peerConnectionsRef.current.get(payload.fromUserId);
-      if (!peerConnection || !payload.candidate) {
-        return;
-      }
-
-      try {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(payload.candidate));
-      } catch {
-        setCallError('Could not add network candidate for the call.');
-      }
-    };
-
-    const handleGroupCallParticipants = async (payload) => {
-      const call = activeCallRef.current;
-      if (!call || call.callId !== payload.callId) {
-        return;
-      }
-
-      for (const participant of payload.participants || []) {
-        try {
-          const peerConnection = await createPeerConnection(participant.userId, payload.callId, participant.name);
-          const offer = await peerConnection.createOffer();
-          await peerConnection.setLocalDescription(offer);
-          socket.emit('webrtc_offer', {
-            callId: payload.callId,
-            fromUserId: currentUserId,
-            fromName: currentUserName,
-            toUserId: participant.userId,
-            offer,
-          });
-        } catch (error) {
-          setCallError(error.message);
-        }
-      }
-    };
-
-    const handleGroupParticipantLeft = (payload) => {
-      removeRemoteParticipant(payload.userId);
-    };
-
-    const handleCallRejected = () => {
-      setCallError('Call was declined.');
-      resetCall();
-    };
-
-    const handleCallEnded = () => {
-      resetCall();
-    };
-
-    const handleCallError = (error) => {
-      setCallError(error.message || 'Call failed.');
-    };
-
-    socket.on('incoming_call', handleIncomingCall);
-    socket.on('incoming_group_call', handleIncomingGroupCall);
-    socket.on('call_accepted', handleCallAccepted);
-    socket.on('call_rejected', handleCallRejected);
-    socket.on('call_ended', handleCallEnded);
-    socket.on('call_error', handleCallError);
-    socket.on('webrtc_offer', handleWebRtcOffer);
-    socket.on('webrtc_answer', handleWebRtcAnswer);
-    socket.on('webrtc_ice_candidate', handleIceCandidate);
-    socket.on('group_call_participants', handleGroupCallParticipants);
-    socket.on('group_call_participant_left', handleGroupParticipantLeft);
-
-    return () => {
-      socket.off('incoming_call', handleIncomingCall);
-      socket.off('incoming_group_call', handleIncomingGroupCall);
-      socket.off('call_accepted', handleCallAccepted);
-      socket.off('call_rejected', handleCallRejected);
-      socket.off('call_ended', handleCallEnded);
-      socket.off('call_error', handleCallError);
-      socket.off('webrtc_offer', handleWebRtcOffer);
-      socket.off('webrtc_answer', handleWebRtcAnswer);
-      socket.off('webrtc_ice_candidate', handleIceCandidate);
-      socket.off('group_call_participants', handleGroupCallParticipants);
-      socket.off('group_call_participant_left', handleGroupParticipantLeft);
-    };
-  }, [createPeerConnection, currentUserId, currentUserName, removeRemoteParticipant, resetCall]);
+  const handleEndCall = () => {
+    endCall(globalCallNotification);
+    setGlobalCallNotification(null);
+  };
 
   const toggleMember = (memberId) => {
     setSelectedMembers((current) =>
@@ -871,59 +474,23 @@ export default function ChatBox() {
         </div>
 
         {callStatus !== 'idle' && (
-          <div className="border-b border-slate-200 bg-slate-950 p-3 text-white">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="text-sm font-semibold">
-                  {callStatus === 'incoming' && `${callInfo?.fromName || 'Team member'} is calling`}
-                  {callStatus === 'outgoing' && `Calling ${callInfo?.peerName || callInfo?.targetName || 'team member'}`}
-                  {callStatus === 'active' && callInfo?.type === 'group' && `Group call in ${callInfo?.groupName || 'team chat'}`}
-                  {callStatus === 'active' && callInfo?.type !== 'group' && `In call with ${callInfo?.peerName || callInfo?.fromName || 'team member'}`}
-                  {callStatus === 'ended' && 'Call ended'}
-                </div>
-                <div className="text-xs text-white/60">WebRTC audio and video over Socket.IO signaling</div>
-              </div>
-              <div className="flex items-center gap-2">
-                {callStatus === 'incoming' && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={acceptCall}
-                      className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      type="button"
-                      onClick={rejectCall}
-                      className="rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white"
-                    >
-                      Decline
-                    </button>
-                  </>
-                )}
-                {['outgoing', 'active', 'ended'].includes(callStatus) && (
-                  <button
-                    type="button"
-                    onClick={endCall}
-                    className="rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white"
-                  >
-                    End call
-                  </button>
-                )}
-              </div>
-            </div>
-            {callError && <div className="mb-3 rounded-lg bg-rose-500/15 px-3 py-2 text-xs text-rose-100">{callError}</div>}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {remoteParticipants.map((participant) => (
-                <RemoteVideoTile key={participant.userId} participant={participant} />
-              ))}
-              <div className="overflow-hidden rounded-lg border border-white/15 bg-black">
-                <video ref={localVideoRef} autoPlay muted playsInline className="h-40 w-full object-cover" />
-                <div className="px-3 py-2 text-xs text-white/70">Your camera</div>
-              </div>
-            </div>
-          </div>
+          <VideoCallOverlay
+            callStatus={callStatus}
+            callInfo={callInfo}
+            callError={callError}
+            remoteParticipants={remoteParticipants}
+            localVideoRef={localVideoRef}
+            audioEnabled={audioEnabled}
+            videoEnabled={videoEnabled}
+            isScreenSharing={isScreenSharing}
+            onToggleAudio={toggleAudio}
+            onToggleVideo={toggleVideo}
+            onStartScreenShare={startScreenShare}
+            onStopScreenShare={stopScreenShare}
+            onAccept={acceptCall}
+            onReject={rejectCall}
+            onEnd={handleEndCall}
+          />
         )}
 
         <div className="flex-1 space-y-3 overflow-y-auto bg-white px-4 py-4">

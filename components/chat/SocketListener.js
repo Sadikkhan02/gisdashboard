@@ -55,6 +55,8 @@ export default function SocketListener() {
     socket.on('receive_message', handleReceiveMessage);
     socket.on('incoming_call', handleIncomingCall);
     socket.on('incoming_group_call', (call) => handleIncomingCall({ ...call, type: 'group' }));
+    socket.on('call_ended', () => setCallNotification(null));
+    socket.on('call_rejected', () => setCallNotification(null));
 
     if (!socket.connected) {
       socket.connect();
@@ -69,6 +71,8 @@ export default function SocketListener() {
       socket.off('receive_message', handleReceiveMessage);
       socket.off('incoming_call', handleIncomingCall);
       socket.off('incoming_group_call');
+      socket.off('call_ended');
+      socket.off('call_rejected');
     };
   }, [currentUserId, currentView, activeChatId, incrementUnreadCount, setSocketConnected, appendMessage, setCallNotification]);
 

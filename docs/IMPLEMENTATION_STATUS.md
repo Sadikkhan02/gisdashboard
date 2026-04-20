@@ -3,6 +3,10 @@
 ## Current State
 
 The repository now has completed Phase 1 foundation work, Phase 2 viewport analytics, Phase 3 dashboard visualization, and a Phase 4 real-time direct chat system.
+- [x] Phase 5: Team Management & Activity Tracking
+- [x] Phase 6: Video Calling & Meeting System (WebRTC)
+- [ ] Phase 7: UI Polish & System Optimization
+- [ ] Phase 8: Data-Driven Decision Engine (D3E)
 
 ### Present and usable
 
@@ -47,4 +51,5 @@ The existing UI should be treated as the design baseline. Future development sho
 - `docs/PHASE_2_GOOGLE_MAPS_AND_VIEWPORT_ANALYTICS.md`
 - `docs/PHASE_3_DASHBOARD_ANALYTICS_AND_DATA_VISUALIZATION.md`
 - `docs/PHASE_4_REAL_TIME_CHAT_SYSTEM.md`
+- `docs/PHASE_6_VIDEO_CALLING_AND_MEETING_SYSTEM.md`
 - `docs/PROJECT_EXECUTION_DOCUMENT.md`

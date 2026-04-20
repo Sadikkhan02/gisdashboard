@@ -6,9 +6,9 @@ export default function CallNotificationOverlay() {
   const currentUserId = useAppStore((state) => state.currentUserId);
   const callNotification = useAppStore((state) => state.callNotification);
   const setCallNotification = useAppStore((state) => state.setCallNotification);
-  const setCurrentView = useAppStore((state) => state.setCurrentView);
+  const currentView = useAppStore((state) => state.currentView);
 
-  if (!callNotification) return null;
+  if (!callNotification || currentView === 'connect') return null;
 
   const handlePickCall = () => {
     // Redirect to connect view which will handle the call logic
