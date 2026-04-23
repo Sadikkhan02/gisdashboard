@@ -16,6 +16,7 @@ import ChatBox from '@/components/chat/ChatBox';
 import SocketListener from '@/components/chat/SocketListener';
 import CallNotificationOverlay from '@/components/chat/CallNotificationOverlay';
 import Card from '@/components/common/Card';
+import DecisionIntelligencePanel from '@/components/dashboard/DecisionIntelligencePanel';
 import { fetchViewportAnalytics } from '@/lib/api';
 import { useAppStore } from '@/store/appStore';
 
@@ -114,6 +115,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [region, setRegion] = useState('All Regions');
   const [dateRange, setDateRange] = useState('Last 7 days');
+  const [selectedPriority, setSelectedPriority] = useState('growth');
   
   const currentUser = useAppStore((state) => state.currentUser);
   const currentUserId = useAppStore((state) => state.currentUserId);
@@ -244,6 +246,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-12 gap-4 px-6 pb-6">
               <div className="col-span-12 xl:col-span-8">
                 <MapComponent
+                  key="main-dashboard-map"
                   markers={mapMarkers}
                   heatmapData={heatmapPoints}
                   onLayerChange={handleLayerChange}
@@ -288,6 +291,7 @@ export default function DashboardPage() {
                      </div>
                    )}
                    <MapComponent
+                    key="charts-view-map"
                     markers={mapMarkers}
                     heatmapData={heatmapPoints}
                     onLayerChange={handleLayerChange}
@@ -339,6 +343,68 @@ export default function DashboardPage() {
                     <DonutChart data={pendingCases} title="Pending Cases %" />
                   </Card>
                 </div>
+            </div>
+          </div>
+        )}
+
+        {/* Intelligence View */}
+        {currentView === 'intelligence' && (
+          <div className="grid grid-cols-12 gap-6 p-6 h-[calc(100vh-80px)] overflow-hidden">
+            {/* Left: Tactical Map */}
+            <div className="col-span-12 xl:col-span-8 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Tactical Map Analysis</h2>
+                  <p className="text-xs text-slate-500">Live intelligence gathering based on viewport bounding box</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <select 
+                    value={selectedPriority} 
+                    onChange={(e) => setSelectedPriority(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="growth">Business Expansion</option>
+                    <option value="security">Security Deployment</option>
+                    <option value="infrastructure">Infrastructure Dev</option>
+                    <option value="emergency">Emergency Response</option>
+                    <option value="custom">🛠️ Custom Objective (Manual)</option>
+                  </select>
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Live Engine Active</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1 relative">
+                <MapComponent
+                  key="intelligence-view-map"
+                  markers={mapMarkers}
+                  heatmapData={heatmapPoints}
+                  onLayerChange={handleLayerChange}
+                  onViewportChange={setViewport}
+                  onMarkerClick={setSelectedLocation}
+                />
+              </div>
+            </div>
+
+            {/* Right: Intelligence Panel */}
+            <div className="col-span-12 xl:col-span-4 h-full overflow-y-auto custom-scrollbar pb-6">
+              <div className="bg-slate-900 rounded-xl shadow-2xl p-4 min-h-[800px]">
+                <DecisionIntelligencePanel
+                  bbox={viewport}
+                  priority={selectedPriority}
+                />
+                
+                {/* Tactical Stats Below Panel */}
+                <div className="mt-6 space-y-4">
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                    <h4 className="text-xs font-bold text-white/40 uppercase mb-3 px-1">Resource Allocation</h4>
+                    <MetricRow label="Local Units" value="12 Active" tone="text-indigo-400" />
+                    <MetricRow label="Avg Response" value="4.2 mins" tone="text-white" />
+                    <MetricRow label="Coverage" value="94%" tone="text-emerald-400" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

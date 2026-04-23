@@ -1,6 +1,13 @@
-# 📄 PHASE 8 DOCUMENTATION – DATA-DRIVEN DECISION ENGINE (D3E)
+# 📄 PHASE 8 – DATA-DRIVEN DECISION ENGINE (D3E)
 
-**Project:** GeoSpatial Intelligence Dashboard with Communication System
+## 0. Implementation Workflow (Strategic Path)
+1.  **Phase 8.1: The Brain (API & Logic)** - Implement the `Weighted Sum Model` in the backend to calculate real-time suitability.
+2.  **Phase 8.2: The Core UI (Intelligence Panel)** - Build the Glassmorphic overlay with dynamic Gauges and Radar charts.
+3.  **Phase 8.3: Data Fusion** - Integrate `data.gov.in` population and crime datasets with live map coordinates.
+4.  **Phase 8.4: Tactical Output** - Implement the Recommendation Engine that provides clear "Final Verdicts" for decision makers.
+
+> [!TIP]
+> For instructions on how to use the interface, see the [Decision Engine User Guide](file:///d:/Projects/geo-dashboard/docs/USER_GUIDE_D3E.md).
 
 ---
 

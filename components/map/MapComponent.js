@@ -74,7 +74,7 @@ export default function MapComponent({
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [selectedLayer, setSelectedLayer] = useState('incidents');
   const [tileLayer, setTileLayer] = useState('street');
-  const activeTile = tileLayers[tileLayer];
+  const activeTile = tileLayers[tileLayer] || tileLayers.street;
 
   const markerPoints = useMemo(
     () =>
@@ -108,8 +108,14 @@ export default function MapComponent({
 
   return (
     <div className="relative min-h-[560px] overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-      <MapContainer center={defaultCenter} zoom={5} scrollWheelZoom className="h-[560px] w-full">
-        <TileLayer attribution={activeTile.attribution} url={activeTile.url} />
+      <MapContainer 
+        key={`${tileLayer}-${defaultCenter.join(',')}`}
+        center={defaultCenter} 
+        zoom={5} 
+        scrollWheelZoom 
+        className="h-[560px] w-full"
+      >
+        {activeTile && <TileLayer attribution={activeTile.attribution} url={activeTile.url} />}
         <ViewportReporter onViewportChange={onViewportChange} />
 
         {!showHeatmap &&
