@@ -26,7 +26,6 @@ const DecisionIntelligencePanel = ({ bbox, priority = 'growth' }) => {
   const fetchAnalysis = async () => {
     setLoading(true);
     try {
-      // Map south/west/north/east from Leaflet viewport to the API parameters
       const minLat = bbox.south;
       const minLng = bbox.west;
       const maxLat = bbox.north;
@@ -53,6 +52,48 @@ const DecisionIntelligencePanel = ({ bbox, priority = 'growth' }) => {
   };
 
   if (!bbox) return null;
+
+  // Show animated skeleton loaders while loading initial data
+  if (loading && !data) {
+    return (
+      <div className="flex flex-col gap-4 p-4 bg-slate-900/90 rounded-xl border border-white/10 shadow-2xl animate-pulse min-h-[600px] text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 bg-white/10 rounded-lg"></div>
+            <div className="space-y-2">
+              <div className="h-4 w-28 bg-white/10 rounded"></div>
+              <div className="h-3 w-16 bg-white/10 rounded"></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-center py-6">
+          <div className="w-36 h-36 rounded-full border-8 border-white/5 flex items-center justify-center">
+            <div className="space-y-2 flex flex-col items-center">
+              <div className="h-6 w-12 bg-white/10 rounded"></div>
+              <div className="h-3 w-16 bg-white/10 rounded"></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-40 w-full bg-white/5 rounded-xl border border-white/5 flex items-center justify-center">
+          <div className="h-16 w-16 rounded-full border-2 border-dashed border-white/10 animate-spin"></div>
+        </div>
+
+        <div className="p-4 bg-white/5 border border-white/5 rounded-xl space-y-2">
+          <div className="h-4 w-32 bg-white/10 rounded"></div>
+          <div className="h-3 w-full bg-white/10 rounded"></div>
+          <div className="h-3 w-3/4 bg-white/10 rounded"></div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="h-3 w-28 bg-white/10 rounded mb-3"></div>
+          <div className="h-8 w-full bg-white/5 rounded border border-white/5"></div>
+          <div className="h-8 w-full bg-white/5 rounded border border-white/5"></div>
+        </div>
+      </div>
+    );
+  }
 
   const radarData = data ? [
     { subject: 'Safety', A: data.metrics.safety * 100, fullMark: 100 },
@@ -180,6 +221,17 @@ const DecisionIntelligencePanel = ({ bbox, priority = 'growth' }) => {
                 <span className="text-[11px] text-white/80">{insight}</span>
               </div>
             ))}
+          </div>
+
+          {/* Footer Metadata */}
+          <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[9px] text-white/40">
+            <div className="flex items-center gap-1">
+              <span className="font-semibold text-indigo-400">Source:</span>
+              <span>{data.dataSource || 'PostgreSQL/PostGIS'}</span>
+            </div>
+            <div>
+              <span>Computed: {data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : 'N/A'}</span>
+            </div>
           </div>
         </>
       )}

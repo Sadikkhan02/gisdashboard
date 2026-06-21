@@ -13,11 +13,27 @@ export const useAppStore = create((set) => ({
   messagesByChat: {},
   socketConnected: false,
   currentView: 'dashboard',
+  previousViewBeforeCall: 'dashboard',
   isSidebarExpanded: false,
   selectedLocation: null,
   unreadCounts: {},
   callNotification: null,
-  setCurrentView: (currentView) => set({ currentView }),
+  setCurrentView: (currentView) =>
+    set((state) => ({
+      currentView,
+      previousViewBeforeCall:
+        currentView === 'call' ? state.previousViewBeforeCall : currentView,
+    })),
+  enterCallView: () =>
+    set((state) => ({
+      currentView: 'call',
+      previousViewBeforeCall:
+        state.currentView === 'call' ? state.previousViewBeforeCall : state.currentView,
+    })),
+  exitCallView: () =>
+    set((state) => ({
+      currentView: state.previousViewBeforeCall || 'connect',
+    })),
   toggleSidebar: () => set((state) => ({ isSidebarExpanded: !state.isSidebarExpanded })),
   setSelectedLocation: (selectedLocation) => set({ selectedLocation }),
   incrementUnreadCount: (chatId) =>
@@ -50,6 +66,8 @@ export const useAppStore = create((set) => ({
       activeChatId: 'group-command',
       messagesByChat: {},
       socketConnected: false,
+      currentView: 'dashboard',
+      previousViewBeforeCall: 'dashboard',
     }),
   setActiveRegion: (activeRegion) => set({ activeRegion }),
   setDateRange: (dateRange) => set({ dateRange }),

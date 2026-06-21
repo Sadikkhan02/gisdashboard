@@ -1,19 +1,24 @@
 'use client';
 import { useAppStore } from '@/store/appStore';
 import { getSocketClient } from '@/lib/socket-client';
+import { launchIncomingCallTab } from '@/lib/call-session';
 
 export default function CallNotificationOverlay() {
   const currentUserId = useAppStore((state) => state.currentUserId);
+  const currentUser = useAppStore((state) => state.currentUser);
   const callNotification = useAppStore((state) => state.callNotification);
   const setCallNotification = useAppStore((state) => state.setCallNotification);
   const currentView = useAppStore((state) => state.currentView);
 
-  if (!callNotification || currentView === 'connect') return null;
+  if (!callNotification || currentView === 'call') return null;
 
   const handlePickCall = () => {
-    // Redirect to connect view which will handle the call logic
-    setCurrentView('connect');
-    // Note: The Pick call modal in ChatBox will show up because callNotification is in the store
+    launchIncomingCallTab({
+      currentUserId,
+      currentUserName: currentUser?.name || 'Team member',
+      call: callNotification,
+    });
+    setCallNotification(null);
   };
 
   const handleDecline = () => {

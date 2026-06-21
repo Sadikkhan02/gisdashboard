@@ -19,7 +19,7 @@ The objective of Phase 8 is to evolve the platform from a data visualization too
 
 ## 2. Decision Engine Architecture
 
-The D3E operates as a processing layer between the GIS data (PostGIS/Mock) and the UI. It aggregates raw data from the current viewport and applies a weighted heuristic model to evaluate location suitability for specific objectives (e.g., resource deployment, business expansion, or risk mitigation).
+The D3E operates as a processing layer between the live PostGIS spatial database and the UI. It aggregates raw data from the current Leaflet viewport using spatial indexes and applies a weighted sum model to evaluate location suitability for specific objectives (e.g., resource deployment, business expansion, or risk mitigation).
 
 ### Evaluated Parameters:
 *   **Population Density**: Concentration of residents and commuters.

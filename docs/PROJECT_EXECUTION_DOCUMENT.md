@@ -27,7 +27,7 @@ The repository already includes:
 - top navigation with region and date controls
 - KPI summary cards
 - incident trend, hourly, category, and donut charts
-- Google Maps panel with clustering and heatmap toggle
+- Leaflet map panel with client-side clustering and heatmap toggle
 - activity feed panel
 
 This baseline should remain the core analyst workspace.
@@ -38,8 +38,8 @@ This baseline should remain the core analyst workspace.
 
 Primary capabilities:
 
-- interactive Google Map
-- marker and heatmap visualization
+- interactive Leaflet Map
+- marker clustering and heatmap visualization
 - viewport-aware querying
 - GeoJSON-based storage and retrieval
 - analytics refresh based on visible area
@@ -71,8 +71,8 @@ Primary capabilities:
 
 ### Mapping and Visualization
 
-- Google Maps JavaScript API
-- current marker clustering support
+- Leaflet (OpenStreetMap tile layers)
+- custom grid-based client-side marker clustering
 - charting library should be standardized
 
 Note:
@@ -82,7 +82,9 @@ The current codebase uses `recharts`, while the original brief proposes Apache E
 
 - Next.js API routes
 - Node.js runtime
-- MongoDB for locations, messages, groups, attachments, and call metadata
+- Dual-Database Architecture:
+  - MongoDB: Users, auth, messages, groups, WebRTC signaling sessions
+  - PostgreSQL/PostGIS: Viewport spatial indexing, census demographics, crime data, road networks
 
 ### Realtime
 
@@ -94,15 +96,13 @@ The current codebase uses `recharts`, while the original brief proposes Apache E
 ```text
 Dashboard UI
    ->
-Filter + viewport state
+Filter + viewport state (Leaflet bounds)
    ->
 Next.js API routes
    ->
-MongoDB queries and aggregations
+PostgreSQL + PostGIS spatial queries (ST_Intersects, ST_Contains)
    ->
-Socket.io realtime channel
-   ->
-WebRTC signaling and media sessions
+Decision Intelligence Score (WSM) + Viewport KPI cards
 ```
 
 ## 7. Database Design
@@ -166,35 +166,28 @@ WebRTC signaling and media sessions
 
 ### Viewport-Based Analytics Flow
 
-1. User pans or zooms the map.
-2. The app reads the current map bounds.
+1. User pans or zooms the Leaflet map.
+2. The app reads the current bounding box bounds (north, south, east, west).
 3. Bounds are stored in client state.
-4. The dashboard triggers API requests using those bounds.
-5. MongoDB executes geo-spatial filtering and aggregation.
-6. Map markers, KPI cards, feed highlights, and charts update together.
+4. The dashboard triggers API requests to `/api/analytics` and `/api/decision` with bounding coordinates.
+5. PostGIS executes geo-spatial index filtering using `ST_Intersects` and `ST_MakeEnvelope`.
+6. Map markers (clustered POIs), heatmap points (crimes), KPI cards, and charts update simultaneously.
 
-### Example Geo Query
+### Example PostGIS Query
 
-```javascript
-db.locations.find({
-  location: {
-    $geoWithin: {
-      $box: [
-        [west, south],
-        [east, north]
-      ]
-    }
-  }
-});
+```sql
+SELECT osm_id, name, amenity, category, ST_X(geom) as lng, ST_Y(geom) as lat 
+FROM pois 
+WHERE ST_Intersects(ST_MakeEnvelope(west, south, east, north, 4326), geom) 
+LIMIT 600;
 ```
 
-### Recommended Aggregation Extensions
+### Aggregation Query Details
 
-- count by severity
-- count by category
-- hourly distribution
-- trend over date range
-- top hotspot clusters within current viewport
+- Safety Index: calculated from count of crime incidents in bounding box
+- Growth Index: calculated from density of infrastructure nodes and road density
+- Connectivity Index: calculated from transit nodes and major economic arterials
+- Population Density: estimated by scaling Census demographics against local/global POI ratio
 
 ## 9. Project Workflow
 

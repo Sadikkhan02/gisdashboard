@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { demoUsers } from '@/lib/demoUsers';
 import { loginWithDemoCredentials } from '@/lib/api';
+import { saveCurrentUser } from '@/lib/auth-session';
 import { useAppStore } from '@/store/appStore';
 
 export default function LoginPage() {
@@ -21,7 +22,7 @@ export default function LoginPage() {
 
     try {
       const user = await loginWithDemoCredentials({ email, password });
-      window.localStorage.setItem('geo-dashboard-user', JSON.stringify(user));
+      saveCurrentUser(user);
       setCurrentUser(user);
       router.push('/dashboard');
     } catch (loginError) {

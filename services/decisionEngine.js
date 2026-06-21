@@ -1,7 +1,9 @@
 /**
  * Decision Intelligence Engine (D3E) Service
  * Implements the Weighted Sum Model (WSM) for Geospatial Suitability
+ * Powered by PostgreSQL + PostGIS spatial index
  */
+import { query } from '@/lib/postgres';
 
 class DecisionEngine {
   constructor() {
@@ -16,8 +18,7 @@ class DecisionEngine {
 
   /**
    * Generates a suitability score based on BBox and Priority
-   * In a production environment, this would query PostGIS or external Gov APIs.
-   * For the prototype, it uses a deterministic heuristic based on coordinates.
+   * Queries PostGIS spatial indexes for POI, Roads, and Crime metrics
    */
   async analyzeArea(bbox, priority = 'growth', customWeights = null) {
     let weights;
@@ -27,26 +28,119 @@ class DecisionEngine {
     } else {
       weights = this.priorityWeights[priority] || this.priorityWeights.growth;
     }
+
+    const { minLat, minLng, maxLat, maxLng } = bbox;
     
-    // Extract lat/lng center to use as seed for deterministic "realism"
-    const centerLat = (bbox.minLat + bbox.maxLat) / 2;
-    const centerLng = (bbox.minLng + bbox.maxLng) / 2;
-    
-    // Simulate real-world variances based on location
-    // In reality, these values would come from our DB/GeoJSON layers
-    const metrics = {
-      safety: this._pseudoRandom(centerLat, centerLng, 'safety'),
-      growth: this._pseudoRandom(centerLat + 0.01, centerLng - 0.01, 'growth'),
-      connectivity: this._pseudoRandom(centerLat - 0.02, centerLng + 0.02, 'connectivity'),
-      density: this._pseudoRandom(centerLat, centerLng + 0.005, 'density')
-    };
+    let metrics = {};
+    let dataSource = 'PostgreSQL/PostGIS';
+
+    try {
+      // 1. Calculate safety metric from crime incidents (ST_Intersects with viewport envelope)
+      const crimeRes = await query(
+        `SELECT COUNT(*) as count FROM crime_incidents 
+         WHERE ST_Intersects(ST_MakeEnvelope($1, $2, $3, $4, 4326), geom)`,
+        [minLng, minLat, maxLng, maxLat]
+      );
+      const crimeCount = parseInt(crimeRes.rows[0].count) || 0;
+      // 0 crimes = 1.0 safety. 25+ crimes = 0.1 safety (base)
+      const safety = Math.max(0.1, 1 - (crimeCount / 25));
+
+      // 2. Calculate growth metric (development index) from infrastructure/demand anchor POIs and roads
+      const poiDevRes = await query(
+        `SELECT COUNT(*) as count FROM pois 
+         WHERE category IN ('infrastructure', 'demand_anchor') 
+         AND ST_Intersects(ST_MakeEnvelope($1, $2, $3, $4, 4326), geom)`,
+        [minLng, minLat, maxLng, maxLat]
+      );
+      const devPoiCount = parseInt(poiDevRes.rows[0].count) || 0;
+
+      const roadRes = await query(
+        `SELECT COUNT(*) as count FROM roads 
+         WHERE ST_Intersects(ST_MakeEnvelope($1, $2, $3, $4, 4326), geom)`,
+        [minLng, minLat, maxLng, maxLat]
+      );
+      const roadCount = parseInt(roadRes.rows[0].count) || 0;
+
+      // Normalize growth index (based on typical counts in zoom viewports)
+      const growth = Math.max(0.1, Math.min(1.0, (devPoiCount * 4 + roadCount) / 60));
+
+      // 3. Calculate connectivity (transit index) from transit POIs and major highways
+      const transitRes = await query(
+        `SELECT COUNT(*) as count FROM pois 
+         WHERE category = 'transit' 
+         AND ST_Intersects(ST_MakeEnvelope($1, $2, $3, $4, 4326), geom)`,
+        [minLng, minLat, maxLng, maxLat]
+      );
+      const transitCount = parseInt(transitRes.rows[0].count) || 0;
+
+      const majorRoadRes = await query(
+        `SELECT COUNT(*) as count FROM roads 
+         WHERE highway IN ('primary', 'secondary') 
+         AND ST_Intersects(ST_MakeEnvelope($1, $2, $3, $4, 4326), geom)`,
+        [minLng, minLat, maxLng, maxLat]
+      );
+      const majorRoadCount = parseInt(majorRoadRes.rows[0].count) || 0;
+
+      const connectivity = Math.max(0.1, Math.min(1.0, (transitCount * 5 + majorRoadCount * 2) / 35));
+
+      // 4. Calculate density (population density index) using spatial proxy
+      // a. Get area of the bounding box envelope in sq km
+      const areaRes = await query(
+        `SELECT ST_Area(ST_MakeEnvelope($1, $2, $3, $4, 4326)::geography) / 1000000.0 as area_sq_km`,
+        [minLng, minLat, maxLng, maxLat]
+      );
+      const areaSqKm = parseFloat(areaRes.rows[0].area_sq_km) || 1.0;
+
+      // b. Get count of POIs in the bbox
+      const localPoiRes = await query(
+        `SELECT COUNT(*) as count FROM pois 
+         WHERE ST_Intersects(ST_MakeEnvelope($1, $2, $3, $4, 4326), geom)`,
+        [minLng, minLat, maxLng, maxLat]
+      );
+      const localPois = parseInt(localPoiRes.rows[0].count) || 0;
+
+      // d. Get overall total POIs and population to calculate ratio
+      const totalPoiRes = await query(`SELECT COUNT(*) as count FROM pois`);
+      const totalPois = parseInt(totalPoiRes.rows[0].count) || 1;
+
+      const totalPopRes = await query(
+        `SELECT SUM(value) as pop FROM demographics WHERE indicator = 2 AND geo_level = 2`
+      );
+      const totalPop = parseInt(totalPopRes.rows[0].pop) || 1809733;
+
+      // e. Est pop and density
+      const estPop = (localPois / totalPois) * totalPop;
+      const densityVal = estPop / areaSqKm; // people per sq km
+      const density = Math.max(0.1, Math.min(1.0, densityVal / 15000.0));
+
+      metrics = { safety, growth, connectivity, density };
+    } catch (dbError) {
+      console.warn('PostgreSQL/PostGIS query failed, falling back to mock data:', dbError.message);
+      dataSource = 'Mock Data (PostGIS Unavailable)';
+      
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLng = (minLng + maxLng) / 2;
+      
+      metrics = {
+        safety: this._pseudoRandom(centerLat, centerLng, 'safety'),
+        growth: this._pseudoRandom(centerLat + 0.01, centerLng - 0.01, 'growth'),
+        connectivity: this._pseudoRandom(centerLat - 0.02, centerLng + 0.02, 'connectivity'),
+        density: this._pseudoRandom(centerLat, centerLng + 0.005, 'density')
+      };
+    }
+
+    // Resolve specific weights for WSM
+    const safetyWeight = weights.crime !== undefined ? weights.crime : (weights.safety || 0);
+    const densityWeight = weights.population !== undefined ? weights.population : (weights.density || 0);
+    const growthWeight = weights.development !== undefined ? weights.development : (weights.growth || 0);
+    const connectivityWeight = weights.connectivity || 0;
 
     // Calculate Final Weighted Score (0-100)
     const score = Math.round(
-      (metrics.safety * (weights.crime || weights.safety || 0) * 100) + 
-      (metrics.density * (weights.population || weights.density || 0) * 100) + 
-      (metrics.growth * (weights.development || weights.growth || 0) * 100) +
-      (metrics.connectivity * (weights.connectivity || weights.transit || 0) * 100)
+      (metrics.safety * safetyWeight * 100) + 
+      (metrics.density * densityWeight * 100) + 
+      (metrics.growth * growthWeight * 100) +
+      (metrics.connectivity * connectivityWeight * 100)
     );
 
     const rating = this._getRating(score);
@@ -59,12 +153,12 @@ class DecisionEngine {
       recommendation: recommendation,
       keyInsights: insights,
       metrics: metrics,
+      dataSource: dataSource,
       timestamp: new Date().toISOString()
     };
   }
 
   _pseudoRandom(lat, lng, salt) {
-    // Generates a deterministic float between 0.2 and 0.95 based on coordinates
     const str = `${lat}${lng}${salt}`;
     let hash = 0;
     for (let i = 0; i < str.length; i++) {

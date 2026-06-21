@@ -17,6 +17,7 @@ import SocketListener from '@/components/chat/SocketListener';
 import CallNotificationOverlay from '@/components/chat/CallNotificationOverlay';
 import Card from '@/components/common/Card';
 import DecisionIntelligencePanel from '@/components/dashboard/DecisionIntelligencePanel';
+import { clearCurrentUser, readCurrentUser } from '@/lib/auth-session';
 import { fetchViewportAnalytics } from '@/lib/api';
 import { useAppStore } from '@/store/appStore';
 
@@ -29,83 +30,41 @@ const MapComponent = dynamic(() => import('@/components/map/MapComponent'), {
   ),
 });
 
-function getMockDashboardData() {
-  return {
-    kpiData: {
-      totalLocations: '6',
-      totalPopulation: '174,000',
-      totalCrime: '808',
-      avgDevelopment: '79%',
-      totalLocationsChange: 6,
-      totalPopulationChange: 4,
-      totalCrimeChange: 9,
-      avgDevelopmentChange: 2,
-    },
-    trendData: [
-      { label: 'Week 1', crime: 520, baseline: 490 },
-      { label: 'Week 2', crime: 610, baseline: 560 },
-      { label: 'Week 3', crime: 700, baseline: 640 },
-      { label: 'Week 4', crime: 808, baseline: 700 },
-    ],
-    hourlyData: [
-      { label: '06:00', value: 65 },
-      { label: '12:00', value: 140 },
-      { label: '18:00', value: 210 },
-      { label: '22:00', value: 96 },
-    ],
-    areaData: [
-      { label: 'Population', primary: 174, secondary: 145 },
-      { label: 'Crime', primary: 808, secondary: 662 },
-      { label: 'Development', primary: 79, secondary: 72 },
-    ],
-    categoryData: [
-      { name: 'Theft', value: 305 },
-      { name: 'Fraud', value: 298 },
-      { name: 'Cyber', value: 95 },
-      { name: 'Other', value: 110 },
-    ],
-    pieData: [
-      { name: 'Low', value: 2 },
-      { name: 'Medium', value: 2 },
-      { name: 'High', value: 2 },
-    ],
-    mapMarkers: [
-      { id: 'delhi', name: 'Delhi Central', position: { lat: 28.6139, lng: 77.209 }, crime: 165 },
-      { id: 'mumbai', name: 'Mumbai Harbor', position: { lat: 19.076, lng: 72.8777 }, crime: 210 },
-      { id: 'bengaluru', name: 'Bengaluru Tech Park', position: { lat: 12.9716, lng: 77.5946 }, crime: 95 },
-      { id: 'hyderabad', name: 'Hyderabad West', position: { lat: 17.385, lng: 78.4867 }, crime: 110 },
-      { id: 'kolkata', name: 'Kolkata North', position: { lat: 22.5726, lng: 88.3639 }, crime: 140 },
-      { id: 'chennai', name: 'Chennai Port', position: { lat: 13.0827, lng: 80.2707 }, crime: 88 },
-    ],
-    heatmapPoints: [
-      { lat: 28.6139, lng: 77.209, weight: 165 },
-      { lat: 19.076, lng: 72.8777, weight: 210 },
-      { lat: 12.9716, lng: 77.5946, weight: 95 },
-      { lat: 17.385, lng: 78.4867, weight: 110 },
-      { lat: 22.5726, lng: 88.3639, weight: 140 },
-      { lat: 13.0827, lng: 80.2707, weight: 88 },
-    ],
-    activeCases: [{ name: 'Active', value: 45 }, { name: 'Other', value: 55 }],
-    resolvedCases: [{ name: 'Resolved', value: 30 }, { name: 'Other', value: 70 }],
-    pendingCases: [{ name: 'Pending', value: 25 }, { name: 'Other', value: 75 }],
-    events: [
-      { id: 1, title: 'Accident on Highway', timestamp: '2 min ago', location: 'Sector 12', severity: 'high' },
-      { id: 2, title: 'Protest rally', timestamp: '15 min ago', location: 'City Center', severity: 'medium' },
-    ],
-    summary: {
-      locationsInView: 6,
-      totalPopulation: 174000,
-      totalCrime: 808,
-      averageDevelopmentIndex: 0.79,
-      dataSource: 'mock',
-    },
-  };
-}
+const emptyDashboardData = {
+  kpiData: {
+    totalLocations: '0',
+    totalPopulation: '0',
+    totalCrime: '0',
+    avgDevelopment: '0%',
+    totalLocationsChange: 0,
+    totalPopulationChange: 0,
+    totalCrimeChange: 0,
+    avgDevelopmentChange: 0,
+  },
+  trendData: [],
+  hourlyData: [],
+  areaData: [],
+  categoryData: [],
+  pieData: [],
+  mapMarkers: [],
+  heatmapPoints: [],
+  activeCases: [{ name: 'Active', value: 0 }, { name: 'Other', value: 100 }],
+  resolvedCases: [{ name: 'Resolved', value: 0 }, { name: 'Other', value: 100 }],
+  pendingCases: [{ name: 'Pending', value: 0 }, { name: 'Other', value: 100 }],
+  events: [],
+  summary: {
+    locationsInView: 0,
+    totalPopulation: 0,
+    totalCrime: 0,
+    averageDevelopmentIndex: 0,
+    dataSource: 'N/A',
+  },
+};
 
-function MetricRow({ label, value, tone = 'text-slate-900' }) {
+function MetricRow({ label, value, tone = 'text-slate-900', borderClass = 'border-slate-100', labelTone = 'text-slate-500' }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
-      <span className="text-sm text-slate-500">{label}</span>
+    <div className={`flex items-center justify-between border-b ${borderClass} py-3 last:border-b-0`}>
+      <span className={`text-sm ${labelTone}`}>{label}</span>
       <span className={`text-sm font-semibold ${tone}`}>{value}</span>
     </div>
   );
@@ -129,10 +88,10 @@ export default function DashboardPage() {
   const selectedLocation = useAppStore((state) => state.selectedLocation);
   const setSelectedLocation = useAppStore((state) => state.setSelectedLocation);
   
-  const fallbackData = getMockDashboardData();
+  const fallbackData = emptyDashboardData;
 
   useEffect(() => {
-    const storedUser = window.localStorage.getItem('geo-dashboard-user');
+    const storedUser = readCurrentUser();
 
     if (!storedUser) {
       router.replace('/login');
@@ -140,7 +99,7 @@ export default function DashboardPage() {
     }
 
     if (!currentUserId) {
-      setCurrentUser(JSON.parse(storedUser));
+      setCurrentUser(storedUser);
     }
   }, [currentUserId, router, setCurrentUser]);
 
@@ -154,7 +113,7 @@ export default function DashboardPage() {
     enabled: Boolean(viewport),
   });
 
-  const dashboardData = analyticsData || fallbackData;
+  const dashboardData = analyticsData || emptyDashboardData;
   const {
     kpiData,
     trendData,
@@ -176,7 +135,7 @@ export default function DashboardPage() {
   };
 
   const handleLogout = () => {
-    window.localStorage.removeItem('geo-dashboard-user');
+    clearCurrentUser();
     logout();
     router.replace('/login');
   };
@@ -237,12 +196,15 @@ export default function DashboardPage() {
         {/* Dashboard View */}
         {currentView === 'dashboard' && (
           <>
-            <KPISection data={selectedLocation ? {
-              ...kpiData,
-              totalLocations: '1',
-              totalCrime: selectedLocation.crime,
-              totalPopulation: (selectedLocation.crime * 210).toLocaleString(),
-            } : kpiData} />
+            <KPISection 
+              isLoading={!analyticsData || isFetching}
+              data={selectedLocation ? {
+                ...kpiData,
+                totalLocations: '1',
+                totalCrime: selectedLocation.crime,
+                totalPopulation: (selectedLocation.crime * 210).toLocaleString(),
+              } : kpiData} 
+            />
             <div className="grid grid-cols-12 gap-4 px-6 pb-6">
               <div className="col-span-12 xl:col-span-8">
                 <MapComponent
@@ -399,9 +361,9 @@ export default function DashboardPage() {
                 <div className="mt-6 space-y-4">
                   <div className="p-4 bg-white/5 rounded-xl border border-white/10">
                     <h4 className="text-xs font-bold text-white/40 uppercase mb-3 px-1">Resource Allocation</h4>
-                    <MetricRow label="Local Units" value="12 Active" tone="text-indigo-400" />
-                    <MetricRow label="Avg Response" value="4.2 mins" tone="text-white" />
-                    <MetricRow label="Coverage" value="94%" tone="text-emerald-400" />
+                    <MetricRow label="Local Units" value="12 Active" tone="text-indigo-400" borderClass="border-white/10" labelTone="text-white/40" />
+                    <MetricRow label="Avg Response" value="4.2 mins" tone="text-white" borderClass="border-white/10" labelTone="text-white/40" />
+                    <MetricRow label="Coverage" value="94%" tone="text-emerald-400" borderClass="border-white/10" labelTone="text-white/40" />
                   </div>
                 </div>
               </div>

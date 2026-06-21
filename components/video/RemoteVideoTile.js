@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 
-export default function RemoteVideoTile({ participant }) {
+export default function RemoteVideoTile({ participant, className = '', videoClassName = '' }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -12,12 +12,12 @@ export default function RemoteVideoTile({ participant }) {
   }, [participant.stream]);
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-900 shadow-lg transition-all hover:border-white/20">
+    <div className={`relative overflow-hidden rounded-xl border border-white/10 bg-slate-900 shadow-lg transition-all hover:border-white/20 ${className}`}>
       <video
         ref={videoRef}
         autoPlay
         playsInline
-        className="h-48 w-full object-cover sm:h-56"
+        className={`h-48 w-full object-cover sm:h-56 ${videoClassName}`}
       />
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950/80 to-transparent px-3 py-3">
         <div className="flex items-center gap-2">

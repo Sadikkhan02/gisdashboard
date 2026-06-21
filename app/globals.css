@@ -57,3 +57,15 @@ body {
 .animate-slide-right {
   animation: slideInRight 0.5s ease-out forwards;
 }
+
+/* Firefox scrollbar compatibility */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+/* Smooth view transitions */
+.view-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+

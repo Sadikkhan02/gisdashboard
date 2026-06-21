@@ -1,11 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchChatDirectory, fetchMessages } from '@/lib/api';
 import { getSocketClient } from '@/lib/socket-client';
-import { useWebRTC } from '@/hooks/useWebRTC';
-import VideoCallOverlay from '@/components/video/VideoCallOverlay';
+import { launchOutgoingCallTab } from '@/lib/call-session';
 import { useAppStore } from '@/store/appStore';
 
 function formatTime(value) {
@@ -80,6 +79,7 @@ function MessageBubble({ message, own }) {
 
 
 export default function ChatBox() {
+  const currentUser = useAppStore((state) => state.currentUser);
   const currentUserId = useAppStore((state) => state.currentUserId);
   const activeChatId = useAppStore((state) => state.activeChatId);
   const setActiveChatId = useAppStore((state) => state.setActiveChatId);
@@ -95,8 +95,6 @@ export default function ChatBox() {
   const setSocketConnected = useAppStore((state) => state.setSocketConnected);
   const unreadCounts = useAppStore((state) => state.unreadCounts);
   const clearUnreadCount = useAppStore((state) => state.clearUnreadCount);
-  const globalCallNotification = useAppStore((state) => state.callNotification);
-  const setGlobalCallNotification = useAppStore((state) => state.setCallNotification);
 
   const [draft, setDraft] = useState('');
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -116,10 +114,7 @@ export default function ChatBox() {
     enabled: Boolean(currentUserId && activeChatId),
   });
 
-  const currentUserName = useMemo(
-    () => directory.users?.find((user) => user.id === currentUserId)?.name || 'Team member',
-    [currentUserId, directory.users]
-  );
+  const currentUserName = currentUser?.name || 'Team member';
 
   useEffect(() => {
     const users = directory.users || [];
@@ -232,65 +227,17 @@ export default function ChatBox() {
     [currentUserId, directory.users]
   );
 
-  const recordCallHistory = useCallback(
-    (message, receiverId) => {
-      if (!receiverId || !currentUserId) {
-        return;
-      }
-
-      getSocketClient().emit('send_message', {
-        senderId: currentUserId,
-        senderName: currentUserName,
-        receiverId,
-        message,
-        type: 'call',
-      });
-    },
-    [currentUserId, currentUserName]
-  );
-
-  const handleCallEndCleanup = useCallback(() => {
-    setGlobalCallNotification(null);
-  }, [setGlobalCallNotification]);
-
-  const {
-    localVideoRef,
-    callStatus,
-    setCallStatus,
-    callInfo,
-    setCallInfo,
-    callError,
-    remoteParticipants,
-    audioEnabled,
-    videoEnabled,
-    isScreenSharing,
-    toggleAudio,
-    toggleVideo,
-    startScreenShare,
-    stopScreenShare,
-    startVideoCall,
-    acceptCall,
-    rejectCall,
-    endCall,
-    resetCall,
-  } = useWebRTC({
-    currentUserId,
-    currentUserName,
-    activeChatUser,
-    onCallHistoryRecord: recordCallHistory,
-    onCallEnd: handleCallEndCleanup,
-  });
-
-  useEffect(() => {
-    if (globalCallNotification && callStatus === 'idle') {
-      setCallStatus('incoming');
-      setCallInfo(globalCallNotification);
+  const handleStartVideoCall = () => {
+    if (!activeChatUser) {
+      setChatNotice('Select a chat before starting a call.');
+      return;
     }
-  }, [globalCallNotification, callStatus, setCallStatus, setCallInfo]);
 
-  const handleEndCall = () => {
-    endCall(globalCallNotification);
-    setGlobalCallNotification(null);
+    launchOutgoingCallTab({
+      currentUserId,
+      currentUserName: currentUser?.name || currentUserName,
+      activeChatUser,
+    });
   };
 
   const toggleMember = (memberId) => {
@@ -343,39 +290,6 @@ export default function ChatBox() {
 
   return (
     <div className="grid h-[36rem] grid-cols-12 overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-900 shadow-sm">
-      {callStatus === 'incoming' && (
-        <div className="fixed left-1/2 top-4 z-[1000] w-[min(92vw,520px)] -translate-x-1/2 rounded-lg border border-[#168c7a]/30 bg-white p-4 text-slate-950 shadow-2xl">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-bold">
-                {callInfo?.type === 'group'
-                  ? `${callInfo?.fromName || 'Team member'} started a group video call`
-                  : `${callInfo?.fromName || 'Team member'} is calling you`}
-              </div>
-              <div className="mt-1 text-xs text-slate-500">
-                {callInfo?.type === 'group' ? callInfo?.groupName || 'Group chat' : 'Direct video call'}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={acceptCall}
-                className="rounded-lg bg-[#168c7a] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#116f61]"
-              >
-                Pick call
-              </button>
-              <button
-                type="button"
-                onClick={rejectCall}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-rose-300 hover:text-rose-700"
-              >
-                Decline
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="col-span-12 border-b border-slate-200 bg-slate-50 p-3 md:col-span-4 md:border-b-0 md:border-r">
         <div className="mb-3 flex items-center justify-between">
           <div>
@@ -465,33 +379,13 @@ export default function ChatBox() {
           </div>
           <button
             type="button"
-            onClick={startVideoCall}
-            disabled={!activeChatUser || callStatus !== 'idle'}
+            onClick={handleStartVideoCall}
+            disabled={!activeChatUser}
             className="rounded-lg border border-[#168c7a] px-3 py-2 text-xs font-semibold text-[#116f61] transition hover:bg-[#e9f8f4] disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
           >
             {activeChatUser?.type === 'group' ? 'Group video call' : 'Video call'}
           </button>
         </div>
-
-        {callStatus !== 'idle' && (
-          <VideoCallOverlay
-            callStatus={callStatus}
-            callInfo={callInfo}
-            callError={callError}
-            remoteParticipants={remoteParticipants}
-            localVideoRef={localVideoRef}
-            audioEnabled={audioEnabled}
-            videoEnabled={videoEnabled}
-            isScreenSharing={isScreenSharing}
-            onToggleAudio={toggleAudio}
-            onToggleVideo={toggleVideo}
-            onStartScreenShare={startScreenShare}
-            onStopScreenShare={stopScreenShare}
-            onAccept={acceptCall}
-            onReject={rejectCall}
-            onEnd={handleEndCall}
-          />
-        )}
 
         <div className="flex-1 space-y-3 overflow-y-auto bg-white px-4 py-4">
           {activeMessages.length === 0 ? (

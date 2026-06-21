@@ -20,19 +20,22 @@ const navItems = [
 
 function UnreadBadge() {
   const unreadCounts = useAppStore((state) => state.unreadCounts || {});
+  const callNotification = useAppStore((state) => state.callNotification);
   const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 
-  if (totalUnread === 0) return null;
+  if (totalUnread === 0 && !callNotification) return null;
 
   return (
-    <span className="absolute -right-1 -top-1 flex h-3 w-3 items-center justify-center rounded-full bg-rose-500 ring-2 ring-white">
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75"></span>
+    <span className={`absolute -right-1 -top-1 flex items-center justify-center rounded-full ring-2 ring-white ${callNotification ? 'h-5 min-w-5 bg-emerald-500 px-1.5' : 'h-3 w-3 bg-rose-500'}`}>
+      <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${callNotification ? 'bg-emerald-400' : 'bg-rose-400'} opacity-75`}></span>
+      {callNotification ? <span className="relative text-[9px] font-bold text-white">Call</span> : null}
     </span>
   );
 }
 
 export default function Sidebar() {
   const { currentView, setCurrentView, isSidebarExpanded, toggleSidebar } = useAppStore();
+  const callNotification = useAppStore((state) => state.callNotification);
 
   return (
     <aside 
@@ -77,7 +80,14 @@ export default function Sidebar() {
                 )}
               </div>
               {isSidebarExpanded && (
-                <span className="font-medium overflow-hidden whitespace-nowrap">{item.label}</span>
+                <span className="font-medium overflow-hidden whitespace-nowrap">
+                  {item.label}
+                  {item.id === 'connect' && callNotification ? (
+                    <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                      Incoming call
+                    </span>
+                  ) : null}
+                </span>
               )}
               
               {!isSidebarExpanded && (
