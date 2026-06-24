@@ -17,6 +17,7 @@ import SocketListener from '@/components/chat/SocketListener';
 import CallNotificationOverlay from '@/components/chat/CallNotificationOverlay';
 import Card from '@/components/common/Card';
 import DecisionIntelligencePanel from '@/components/dashboard/DecisionIntelligencePanel';
+import AnalyticsStudio from '@/components/dashboard/AnalyticsStudio';
 import { clearCurrentUser, readCurrentUser } from '@/lib/auth-session';
 import { fetchViewportAnalytics } from '@/lib/api';
 import { useAppStore } from '@/store/appStore';
@@ -241,71 +242,10 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Charts View */}
+        {/* Charts View (Analytics Studio) */}
         {currentView === 'charts' && (
-          <div className="space-y-4 p-6">
-             <div className="grid grid-cols-12 gap-4">
-                <div className="col-span-12 text-sm">
-                   {selectedLocation && (
-                     <div className="mb-4 flex items-center justify-between rounded-lg bg-[#123c35] px-4 py-3 text-white">
-                        <span>Viewing charts for <strong>{selectedLocation.name}</strong></span>
-                        <button onClick={() => setSelectedLocation(null)} className="text-xs underline hover:text-teal-200">Reset to Global</button>
-                     </div>
-                   )}
-                   <MapComponent
-                    key="charts-view-map"
-                    markers={mapMarkers}
-                    heatmapData={heatmapPoints}
-                    onLayerChange={handleLayerChange}
-                    onViewportChange={setViewport}
-                    onMarkerClick={setSelectedLocation}
-                  />
-                </div>
-             </div>
-             
-             <div className="grid grid-cols-12 gap-4 pb-6">
-              <div className="col-span-12 lg:col-span-6 xl:col-span-3">
-                <Card title="Crime Trend">
-                  <p className="mb-3 text-xs text-slate-500">Weekly reported incidents.</p>
-                  <IncidentTrendChart data={selectedLocation ? trendData.map(d => ({ ...d, crime: d.crime / 4 })) : trendData} />
-                </Card>
-              </div>
-              <div className="col-span-12 lg:col-span-6 xl:col-span-3">
-                <Card title="Crime Distribution">
-                  <p className="mb-3 text-xs text-slate-500">Incident count by category.</p>
-                  <IncidentsByCategoryChart data={categoryData} />
-                </Card>
-              </div>
-              <div className="col-span-12 lg:col-span-6 xl:col-span-3">
-                <Card title="Hourly Pattern">
-                  <p className="mb-3 text-xs text-slate-500">Incidents by time of day.</p>
-                  <IncidentsByHourChart data={hourlyData} />
-                </Card>
-              </div>
-              <div className="col-span-12 lg:col-span-6 xl:col-span-3">
-                <Card title="Comparative Metrics">
-                  <p className="mb-3 text-xs text-slate-500">Population, crime, and development.</p>
-                  <AreaChart data={selectedLocation ? areaData.map(d => ({ ...d, primary: d.primary / 2 })) : areaData} />
-                </Card>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-12 gap-4 pb-6">
-               <div className="col-span-12 grid grid-cols-1 gap-4 md:grid-cols-4 xl:grid-cols-4">
-                  <Card>
-                    <DonutChart data={pieData} title="Viewport Severity" />
-                  </Card>
-                  <Card>
-                    <DonutChart data={activeCases} title="Active Cases %" />
-                  </Card>
-                  <Card>
-                    <DonutChart data={resolvedCases} title="Resolved Cases %" />
-                  </Card>
-                  <Card>
-                    <DonutChart data={pendingCases} title="Pending Cases %" />
-                  </Card>
-                </div>
-            </div>
+          <div className="p-6">
+            <AnalyticsStudio />
           </div>
         )}
 
