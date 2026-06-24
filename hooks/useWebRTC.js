@@ -365,6 +365,20 @@ export function useWebRTC({ currentUserId, currentUserName, activeChatUser, onCa
   useEffect(() => {
     const socket = getSocketClient();
 
+    const handleConnect = () => {
+      if (currentUserId) {
+        socket.emit('join', currentUserId);
+      }
+    };
+
+    socket.on('connect', handleConnect);
+
+    if (!socket.connected) {
+      socket.connect();
+    } else if (currentUserId) {
+      socket.emit('join', currentUserId);
+    }
+
     const handleIncomingCall = (call) => {
       if (activeCallRef.current) {
         socket.emit('reject_call', {
@@ -548,6 +562,7 @@ export function useWebRTC({ currentUserId, currentUserName, activeChatUser, onCa
     socket.on('group_call_participant_left', handleGroupParticipantLeft);
 
     return () => {
+      socket.off('connect', handleConnect);
       socket.off('incoming_call', handleIncomingCall);
       socket.off('incoming_group_call', handleIncomingGroupCall);
       socket.off('call_accepted', handleCallAccepted);
@@ -560,6 +575,8 @@ export function useWebRTC({ currentUserId, currentUserName, activeChatUser, onCa
       socket.off('webrtc_screen_share', handleScreenShare);
       socket.off('group_call_participants', handleGroupCallParticipants);
       socket.off('group_call_participant_left', handleGroupParticipantLeft);
+
+      socket.disconnect();
 
       // Final cleanup: Close connections and stop media tracks
       // We do this without triggering state updates to prevent recursion
