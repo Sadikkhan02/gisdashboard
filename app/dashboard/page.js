@@ -251,9 +251,9 @@ export default function DashboardPage() {
 
         {/* Intelligence View */}
         {currentView === 'intelligence' && (
-          <div className="grid grid-cols-12 gap-6 p-6 h-[calc(100vh-80px)] overflow-hidden">
-            {/* Left: Tactical Map */}
-            <div className="col-span-12 xl:col-span-8 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+          <div className="flex flex-col gap-6 p-6 h-[calc(100vh-80px)] overflow-y-auto custom-scrollbar">
+            {/* Top: Tactical Map */}
+            <div className="w-full bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col h-[550px] shrink-0">
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Tactical Map Analysis</h2>
@@ -265,11 +265,11 @@ export default function DashboardPage() {
                     onChange={(e) => setSelectedPriority(e.target.value)}
                     className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="growth">Business Expansion</option>
-                    <option value="security">Security Deployment</option>
-                    <option value="infrastructure">Infrastructure Dev</option>
-                    <option value="emergency">Emergency Response</option>
-                    <option value="custom">🛠️ Custom Objective (Manual)</option>
+                    <option value="retail">🛒 Retail Expansion</option>
+                    <option value="logistics">🚚 Logistics & Distribution</option>
+                    <option value="residential">🏠 Residential Dev</option>
+                    <option value="healthcare">❤️ Healthcare Facility</option>
+                    <option value="custom">🛠️ Custom WSM Model</option>
                   </select>
                   <div className="flex items-center gap-2">
                     <div className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -289,17 +289,17 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Right: Intelligence Panel */}
-            <div className="col-span-12 xl:col-span-4 h-full overflow-y-auto custom-scrollbar pb-6">
-              <div className="bg-slate-900 rounded-xl shadow-2xl p-4 min-h-[800px]">
+            {/* Bottom: Intelligence Panel */}
+            <div className="w-full">
+              <div className="bg-slate-900 rounded-xl shadow-2xl p-5">
                 <DecisionIntelligencePanel
                   bbox={viewport}
                   priority={selectedPriority}
                 />
                 
                 {/* Tactical Stats Below Panel */}
-                <div className="mt-6 space-y-4">
-                  <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                <div className="mt-6">
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/10 max-w-md">
                     <h4 className="text-xs font-bold text-white/40 uppercase mb-3 px-1">Resource Allocation</h4>
                     <MetricRow label="Local Units" value="12 Active" tone="text-indigo-400" borderClass="border-white/10" labelTone="text-white/40" />
                     <MetricRow label="Avg Response" value="4.2 mins" tone="text-white" borderClass="border-white/10" labelTone="text-white/40" />

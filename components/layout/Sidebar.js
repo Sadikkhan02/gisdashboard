@@ -50,7 +50,7 @@ export default function Sidebar() {
           </div>
           {isSidebarExpanded && (
             <div className="overflow-hidden whitespace-nowrap">
-              <div className="font-bold text-slate-950">GeoIntel</div>
+              <div className="font-bold text-slate-950">GeoDash</div>
               <div className="text-[10px] font-semibold uppercase tracking-wider text-[#168c7a]">Command Center</div>
             </div>
           )}

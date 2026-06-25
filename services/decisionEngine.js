@@ -7,12 +7,16 @@ import { query } from '@/lib/postgres';
 
 class DecisionEngine {
   constructor() {
-    // Default weights for different mission priorities
+    // Default weights for different mission priorities and use cases
     this.priorityWeights = {
-      security: { crime: 0.5, population: 0.3, development: 0.2 },
-      growth: { development: 0.45, population: 0.35, crime: 0.2 },
-      infrastructure: { development: 0.5, population: 0.2, crime: 0.3 },
-      emergency: { population: 0.6, development: 0.2, crime: 0.2 }
+      security: { safety: 0.5, density: 0.3, growth: 0.2, connectivity: 0 },
+      growth: { safety: 0.2, density: 0.35, growth: 0.45, connectivity: 0 },
+      infrastructure: { safety: 0.3, density: 0.2, growth: 0.5, connectivity: 0 },
+      emergency: { safety: 0.2, density: 0.6, growth: 0.2, connectivity: 0 },
+      retail: { safety: 0.15, density: 0.40, growth: 0.30, connectivity: 0.15 },
+      logistics: { safety: 0.10, density: 0.10, growth: 0.35, connectivity: 0.45 },
+      residential: { safety: 0.45, density: 0.20, growth: 0.15, connectivity: 0.20 },
+      healthcare: { safety: 0.20, density: 0.30, growth: 0.25, connectivity: 0.25 }
     };
   }
 

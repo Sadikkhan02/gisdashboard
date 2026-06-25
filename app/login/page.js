@@ -47,7 +47,7 @@ export default function LoginPage() {
               G
             </div>
             <div>
-              <div className="text-lg font-semibold">GeoIntel</div>
+              <div className="text-lg font-semibold">GeoDash</div>
               <div className="text-xs text-white/70">Operations dashboard</div>
             </div>
           </div>

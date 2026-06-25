@@ -11,7 +11,7 @@ export default function Navbar({ user, onLogout, onRegionChange, onDateRangeChan
         <div className="mr-2 flex items-center gap-2">
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#168c7a] font-bold text-white">G</div>
           <div>
-            <div className="text-lg font-bold text-slate-950">GeoIntel</div>
+            <div className="text-lg font-bold text-slate-950">GeoDash</div>
             <div className="text-xs text-slate-500">Live command view</div>
           </div>
         </div>
